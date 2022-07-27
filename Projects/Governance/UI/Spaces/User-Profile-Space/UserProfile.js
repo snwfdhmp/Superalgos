@@ -15,16 +15,16 @@ function newGovernanceUserProfileSpace() {
     }
 
     let waitingForResponses = 0
-    const BSC_SCAN_RATE_LIMIT_DELAY = 6000
+    const BSC_SCAN_RATE_LIMIT_DELAY = 6000 * 6
     let reputationByAddress = new Map()
 
     return thisObject
 
     function initialize() {
         /*
-        If the workspace is not related to governance, then we exit the Intialize Function
+        If the workspace is not related to governance, then we exit the Initialize Function
         */
-        let governanceProject = UI.projects.foundations.spaces.designSpace.workspace.getProjectHeadByNodeType('Governance Project')
+        let governanceProject = UI.projects.workspaces.spaces.designSpace.workspace.getProjectHeadByNodeType('Governance Project')
         if (governanceProject === undefined) { return }
         /*
         Here we will run the distribution process, that in turn will run all the programs.
@@ -46,29 +46,41 @@ function newGovernanceUserProfileSpace() {
         /*
         We are going to collapse all User rootNodes to save processing resources at the UI
         */
-        let rootNodes = UI.projects.foundations.spaces.designSpace.workspace.workspaceNode.rootNodes
+        let rootNodes = UI.projects.workspaces.spaces.designSpace.workspace.workspaceNode.rootNodes
 
         for (let i = 0; i < rootNodes.length; i++) {
             let rootNode = rootNodes[i]
+            if (rootNode.payload === undefined) { continue }
             if (rootNode.payload.floatingObject.isCollapsed !== true) {
                 rootNode.payload.floatingObject.collapseToggle()
             }
         }
-        let userProfiles = UI.projects.foundations.spaces.designSpace.workspace.getHierarchyHeadsByNodeType('User Profile')
-        let pools = UI.projects.foundations.spaces.designSpace.workspace.getHierarchyHeadsByNodeType('Pools')
-        let assets = UI.projects.foundations.spaces.designSpace.workspace.getHierarchyHeadsByNodeType('Assets')
-        let features = UI.projects.foundations.spaces.designSpace.workspace.getHierarchyHeadsByNodeType('Features')
-        let positions = UI.projects.foundations.spaces.designSpace.workspace.getHierarchyHeadsByNodeType('Positions')
+        let userProfiles = UI.projects.workspaces.spaces.designSpace.workspace.getHierarchyHeadsByNodeType('User Profile')
 
+        // Initialise the isLoading parameter for each User Profile
+        for (let i = 0; i < userProfiles.length; i++) {
+            let userProfile = userProfiles[i]
+
+            if (userProfile.payload.isLoading === undefined) {
+                userProfile.payload.isLoading = true
+            }
+        }
+        /*
+        let pools = UI.projects.workspaces.spaces.designSpace.workspace.getHierarchyHeadsByNodeType('Pools')
+        let assets = UI.projects.workspaces.spaces.designSpace.workspace.getHierarchyHeadsByNodeType('Assets')
+        let features = UI.projects.workspaces.spaces.designSpace.workspace.getHierarchyHeadsByNodeType('Features')
+        let positions = UI.projects.workspaces.spaces.designSpace.workspace.getHierarchyHeadsByNodeType('Positions')
+        */
         const SPACE_WIDTH = UI.projects.foundations.spaces.floatingSpace.container.frame.width
         const SPACE_HEIGHT = UI.projects.foundations.spaces.floatingSpace.container.frame.height
 
-        arrangeNodes(userProfiles, SPACE_HEIGHT * 0.245, 3800, 4)
+        arrangeNodes(userProfiles, SPACE_HEIGHT * 0.280, 4800, 6)
+        /*
         arrangeNodes(pools, SPACE_HEIGHT * 0.570, 0, 1)
         arrangeNodes(features, SPACE_HEIGHT * 0.620, 0, 1)
         arrangeNodes(positions, SPACE_HEIGHT * 0.660, 0, 1)
         arrangeNodes(assets, SPACE_HEIGHT * 0.735, 3800, 4)
-
+        */
 
         function arrangeNodes(nodes, yLevel, yStep, rows) {
             /*
@@ -103,6 +115,14 @@ function newGovernanceUserProfileSpace() {
                         break
                     }
                     case (yOffset === yStep * 3): {
+                        yOffset = yStep * 4
+                        break
+                    }
+                    case (yOffset === yStep * 4): {
+                        yOffset = yStep * 5
+                        break
+                    }
+                    case (yOffset === yStep * 5): {
                         yOffset = 0
                         break
                     }
@@ -133,15 +153,17 @@ function newGovernanceUserProfileSpace() {
                     if (transfer.from !== UI.projects.governance.globals.saToken.SA_TOKEN_BSC_TREASURY_ACCOUNT_ADDRESS) { continue }
 
                     let currentReputation = Number(transfer.value) / UI.projects.governance.globals.saToken.SA_TOKEN_BSC_DECIMAL_FACTOR
+
                     let previousReputation = reputationByAddress.get(transfer.to.toLowerCase())
-                    let newReputation = previousReputation | 0 + currentReputation
+                    if (previousReputation === undefined) { previousReputation = 0 }
+                    let newReputation = previousReputation + currentReputation
                     reputationByAddress.set(transfer.to.toLowerCase(), newReputation)
                 }
-                //console.log('[INFO] tokenTransfers = ' + JSON.stringify(tokenTransfers))
+                //console.log((new Date()).toISOString(), '[INFO] tokenTransfers = ' + JSON.stringify(tokenTransfers))
                 if (tokenTransfers.length > 9000) {
-                    console.log('[WARN] The total amount of BSC SA Token transfers is above 9000. After 10k this method will need pagination or otherwise users will not get their reputation calculated correctly.')
+                    console.log((new Date()).toISOString(), '[WARN] The total amount of BSC SA Token transfers is above 9000. After 10k this method will need pagination or otherwise users will not get their reputation calculated correctly.')
                 } else {
-                    console.log('[INFO] ' + tokenTransfers.length + ' reputation trasactions found at the blockchain. ')
+                    console.log((new Date()).toISOString(), '[INFO] ' + tokenTransfers.length + ' reputation transactions found at the blockchain. ')
                 }
                 waitingForResponses--
             }).catch(function (err) {
@@ -153,23 +175,23 @@ function newGovernanceUserProfileSpace() {
 
         /* Find the Github Username and Token in order to activate the Github Program */
 
-        let apisNode = UI.projects.foundations.spaces.designSpace.workspace.getHierarchyHeadByNodeType('APIs')
+        let apisNode = UI.projects.workspaces.spaces.designSpace.workspace.getHierarchyHeadByNodeType('APIs')
         if (apisNode === undefined) {
-            console.log('[WARN] Github Program Disabled because the Github Credentials are not present at this workspace. APIs node not found.')
+            console.log((new Date()).toISOString(), '[WARN] Github Program Disabled because the Github Credentials are not present at this workspace. APIs node not found.')
             return
         }
         if (apisNode.githubAPI === undefined) {
-            console.log('[WARN] Github Program Disabled because the Github Credentials are not present at this workspace. Github API node not found.')
+            console.log((new Date()).toISOString(), '[WARN] Github Program Disabled because the Github Credentials are not present at this workspace. Github API node not found.')
             return
         }
 
         let config = JSON.parse(apisNode.githubAPI.config)
         if (config.username === undefined || config.username === "") {
-            console.log('[WARN] Github Program Disabled because the Github Credentials are not present at this workspace. Github Username not configured.')
+            console.log((new Date()).toISOString(), '[WARN] Github Program Disabled because the Github Credentials are not present at this workspace. Github Username not configured.')
             return
         }
         if (config.token === undefined || config.token === "") {
-            console.log('[WARN] Github Program Disabled because the Github Credentials are not present at this workspace. Github Token not configured.')
+            console.log((new Date()).toISOString(), '[WARN] Github Program Disabled because the Github Credentials are not present at this workspace. Github Token not configured.')
             return
         }
         /*
@@ -194,8 +216,8 @@ function newGovernanceUserProfileSpace() {
 
                 /* Lets check the result of the call through the http interface */
                 if (err.result !== GLOBAL.DEFAULT_OK_RESPONSE.result) {
-                    console.log('[ERROR] Call via HTTP Interface failed. err.stack = ' + err.stack)
-                    console.log('[ERROR] params = ' + JSON.stringify(params))
+                    console.log((new Date()).toISOString(), '[ERROR] Call via HTTP Interface failed. err.stack = ' + err.stack)
+                    console.log((new Date()).toISOString(), '[ERROR] params = ' + JSON.stringify(params))
                     return
                 }
 
@@ -203,9 +225,9 @@ function newGovernanceUserProfileSpace() {
 
                 /* Lets check the result of the method call */
                 if (response.result !== GLOBAL.DEFAULT_OK_RESPONSE.result) {
-                    console.log('[ERROR] Call to Client Github Server failed. err.stack = ' + err.stack)
-                    console.log('[ERROR] params = ' + JSON.stringify(params))
-                    console.log('[ERROR] response = ' + JSON.stringify(response))
+                    console.log((new Date()).toISOString(), '[ERROR] Call to Client Github Server failed. err.stack = ' + err.stack)
+                    console.log((new Date()).toISOString(), '[ERROR] params = ' + JSON.stringify(params))
+                    console.log((new Date()).toISOString(), '[ERROR] response = ' + JSON.stringify(response))
                     return
                 }
 
@@ -239,8 +261,8 @@ function newGovernanceUserProfileSpace() {
 
                 /* Lets check the result of the call through the http interface */
                 if (err.result !== GLOBAL.DEFAULT_OK_RESPONSE.result) {
-                    console.log('[ERROR] Call via HTTP Interface failed. err.stack = ' + err.stack)
-                    console.log('[ERROR] params = ' + JSON.stringify(params))
+                    console.log((new Date()).toISOString(), '[ERROR] Call via HTTP Interface failed. err.stack = ' + err.stack)
+                    console.log((new Date()).toISOString(), '[ERROR] params = ' + JSON.stringify(params))
                     return
                 }
 
@@ -248,9 +270,9 @@ function newGovernanceUserProfileSpace() {
 
                 /* Lets check the result of the method call */
                 if (response.result !== GLOBAL.DEFAULT_OK_RESPONSE.result) {
-                    console.log('[ERROR] Call to Client Github Server failed. err.stack = ' + err.stack)
-                    console.log('[ERROR] params = ' + JSON.stringify(params))
-                    console.log('[ERROR] response = ' + JSON.stringify(response))
+                    console.log((new Date()).toISOString(), '[ERROR] Call to Client Github Server failed. err.stack = ' + err.stack)
+                    console.log((new Date()).toISOString(), '[ERROR] params = ' + JSON.stringify(params))
+                    console.log((new Date()).toISOString(), '[ERROR] response = ' + JSON.stringify(response))
                     return
                 }
 
@@ -284,8 +306,8 @@ function newGovernanceUserProfileSpace() {
 
                 /* Lets check the result of the call through the http interface */
                 if (err.result !== GLOBAL.DEFAULT_OK_RESPONSE.result) {
-                    console.log('[ERROR] Call via HTTP Interface failed. err.stack = ' + err.stack)
-                    console.log('[ERROR] params = ' + JSON.stringify(params))
+                    console.log((new Date()).toISOString(), '[ERROR] Call via HTTP Interface failed. err.stack = ' + err.stack)
+                    console.log((new Date()).toISOString(), '[ERROR] params = ' + JSON.stringify(params))
                     return
                 }
 
@@ -293,9 +315,9 @@ function newGovernanceUserProfileSpace() {
 
                 /* Lets check the result of the method call */
                 if (response.result !== GLOBAL.DEFAULT_OK_RESPONSE.result) {
-                    console.log('[ERROR] Call to Client Github Server failed. err.stack = ' + err.stack)
-                    console.log('[ERROR] params = ' + JSON.stringify(params))
-                    console.log('[ERROR] response = ' + JSON.stringify(response))
+                    console.log((new Date()).toISOString(), '[ERROR] Call to Client Github Server failed. err.stack = ' + err.stack)
+                    console.log((new Date()).toISOString(), '[ERROR] params = ' + JSON.stringify(params))
+                    console.log((new Date()).toISOString(), '[ERROR] response = ' + JSON.stringify(response))
                     return
                 }
 
@@ -344,16 +366,16 @@ function newGovernanceUserProfileSpace() {
 
     function physics() {
 
-        if (UI.projects.foundations.spaces.designSpace.workspace === undefined) { return }
+        if (UI.projects.workspaces.spaces.designSpace.workspace === undefined) { return }
         /*
-        If the workspace is not related to governance, then we exit the Intialize Function
+        If the workspace is not related to governance, then we exit the Initialize Function
         */
-        let governanceProject = UI.projects.foundations.spaces.designSpace.workspace.getProjectHeadByNodeType('Governance Project')
+        let governanceProject = UI.projects.workspaces.spaces.designSpace.workspace.getProjectHeadByNodeType('Governance Project')
         if (governanceProject === undefined) { return }
         /*
         Load the user profiles with Token Power.
         */
-        let userProfiles = UI.projects.foundations.spaces.designSpace.workspace.getHierarchyHeadsByNodeType('User Profile')
+        let userProfiles = UI.projects.workspaces.spaces.designSpace.workspace.getHierarchyHeadsByNodeType('User Profile')
         if (waitingForResponses !== 0) { return }
         /*
         We will get all the user Profiles tokens from the blockchain, making a call
@@ -363,14 +385,23 @@ function newGovernanceUserProfileSpace() {
             let userProfile = userProfiles[i]
             if (userProfile.payload === undefined) { continue }
 
+            if (userProfile.payload.bloackchainBalancesLoading === true) {
+                userProfile.payload.isLoading = true
+                return
+            }
+
             if (userProfile.payload.blockchainTokens === undefined) {
+                userProfile.payload.bloackchainBalancesLoading = true
+                userProfile.payload.isLoading = true
+                UI.projects.foundations.spaces.cockpitSpace.setStatus('Loading blockchain balances for User Profile # ' + (i + 1) + ' / ' + userProfiles.length, 1500, UI.projects.foundations.spaces.cockpitSpace.statusTypes.ALL_GOOD)
+
                 getBlockchainAccount(userProfile)
                 return
             }
         }
 
         function getBlockchainAccount(userProfile) {
-            let signature = UI.projects.foundations.utilities.nodeConfig.loadConfigProperty(userProfile.payload, 'signature')
+            let signature = UI.projects.visualScripting.utilities.nodeConfig.loadConfigProperty(userProfile.payload, 'signature')
             if (signature === undefined || signature === "") { return }
 
             let request = {
@@ -384,6 +415,7 @@ function newGovernanceUserProfileSpace() {
             httpRequest(JSON.stringify(request.params), request.url, onResponse)
 
             function onResponse(err, data) {
+
                 /* Lets check the result of the call through the http interface */
                 if (err.result !== GLOBAL.DEFAULT_OK_RESPONSE.result) {
                     userProfile.payload.uiObject.setErrorMessage(
@@ -412,43 +444,118 @@ function newGovernanceUserProfileSpace() {
                     blockchainAccount !== "" &&
                     userProfile.payload.blockchainTokens === undefined
                 ) {
-                    waitingForResponses++
-                    userProfile.payload.blockchainTokens = 0 // We need to set this value here so that the next call to BSCSCAN is not done more than once.
-                    setTimeout(getBlockchainTokens, BSC_SCAN_RATE_LIMIT_DELAY, userProfile, blockchainAccount)
+                    /* Obtain balance for each asset/liquidity pool configured in SaToken.js */
+                    let assetList = UI.projects.governance.globals.saToken.SA_TOKEN_BSC_LIQUIDITY_ASSETS
+                    let initValues = {}
+                    for (let tokenId of assetList) {
+                        initValues[tokenId] = 0
+                    }
+                    userProfile.payload.liquidityTokens = initValues
+                    for (let tokenId of assetList) {
+                        getLiquidityTokenBalance(userProfile, blockchainAccount, tokenId)
+                    }
+
+                    /* 
+                    Now we get the SA Tokens Balance.
+                    */
+                    getBlockchainTokens(userProfile, blockchainAccount)
                 }
             }
         }
 
         function getBlockchainTokens(userProfile, blockchainAccount) {
-            console.log('[INFO] Loading Blockachain Balance for User Profile: ', userProfile.name, 'blockchainAccount: ', blockchainAccount)
-            const url = "https://api.bscscan.com/api?module=account&action=tokenbalance&contractaddress=" + UI.projects.governance.globals.saToken.SA_TOKEN_BSC_CONTRACT_ADDRESS + "&address=" + blockchainAccount + "&tag=latest&apikey=YourApiKeyToken"
+            console.log((new Date()).toISOString(), '[INFO] Loading Blockchain Balance for User Profile: ', userProfile.name, 'blockchainAccount: ', blockchainAccount)
 
-            fetch(url).then(function (response) {
-                return response.json();
-            }).then(function (data) {
-                //console.log(data)
-                if (data.result === "Max rate limit reached, please use API Key for higher rate limit") {
-                    userProfile.payload.blockchainTokens = undefined // This enables this profile to query the blockchain again.
+            let request = {
+                url: 'WEB3',
+                params: {
+                    method: "getUserWalletBalance",
+                    walletAddress: blockchainAccount,
+                    contractAddress: UI.projects.governance.globals.saToken.SA_TOKEN_BSC_CONTRACT_ADDRESS
+                }
+            }
+
+            httpRequest(JSON.stringify(request.params), request.url, onResponse)
+
+            function onResponse(err, data) {
+                userProfile.payload.bloackchainBalancesLoading = false
+                userProfile.payload.isLoading = false
+                if (err.result === GLOBAL.DEFAULT_FAIL_RESPONSE) {
+                    console.log((new Date()).toISOString(), '[WARN] Error fetching blockchain tokens of user profile ' + userProfile.name)
+                    userProfile.payload.blockchainTokens = undefined
                 } else {
-                    userProfile.payload.uiObject.setInfoMessage('Blockchan Balance Succesfully Loaded.',
+                    let commandResponse = JSON.parse(data)
+                    if (commandResponse.result !== "Ok") {
+                        console.log((new Date()).toISOString(), '[WARN] Web3 Error fetching blockchain tokens of user profile ' + userProfile.name)
+                        return
+                    }                    
+                    userProfile.payload.uiObject.setInfoMessage('Blockchain Balance Successfully Loaded.',
                         UI.projects.governance.globals.designer.SET_INFO_COUNTER_FACTOR
                     )
-                    userProfile.payload.blockchainTokens = Number(data.result) / 1000000000000000000
+                    userProfile.payload.blockchainTokens = Number(commandResponse.balance)
+                    console.log((new Date()).toISOString(), '[INFO] SA Balance of ' + userProfile.name + ' is ', userProfile.payload.blockchainTokens)
                     userProfile.payload.reputation = Math.min(reputationByAddress.get(blockchainAccount.toLowerCase()) | 0, userProfile.payload.blockchainTokens)
-                    console.log('Reputation of ' + userProfile.name + ' is ' , userProfile.payload.reputation)
+                    console.log((new Date()).toISOString(), '[INFO] Reputation of ' + userProfile.name + ' is ', userProfile.payload.reputation)
                 }
-                waitingForResponses--
-            }).catch(function (err) {
-                const message = err.message + ' - ' + 'Can not access BSC SCAN servers.'
-                console.log(message)
-                if (userProfile.payload !== undefined) {
-                    userProfile.payload.uiObject.setErrorMessage(message,
-                        UI.projects.governance.globals.designer.SET_ERROR_COUNTER_FACTOR
-                    )
-                }
-                waitingForResponses--
-            });
+            }
         }
+
+
+        function getLiquidityTokenBalance(userProfile, blockchainAccount, asset) {
+            const exchanges = UI.projects.governance.globals.saToken.SA_TOKEN_BSC_EXCHANGES
+            let tokenTotal = 0
+            
+            /* Obtain contract addresses for configured liquidity pools */
+            let contracts = {}
+            for (let i = 0; i < exchanges.length; i++) {
+                let contractIdentifier = 'UI.projects.governance.globals.saToken.SA_TOKEN_BSC_' + exchanges[i] + '_LIQUIDITY_POOL_' + asset + '_CONTRACT_ADDRESS'
+                let marketContract = ''
+                marketContract = eval(contractIdentifier)
+                if (marketContract !== undefined) {
+                    contracts[exchanges[i]] = marketContract
+                }
+            }
+            
+            let neededResponses = Object.keys(contracts).length
+            for (let dex in contracts) {
+                //console.log((new Date()).toISOString(), '[INFO] Loading ' + dex + ' Balance for User Profile: ' + userProfile.name + ' blockchainAccount: ' + blockchainAccount + ' asset: ' + asset)
+                let request = {
+                    url: 'WEB3',
+                    params: {
+                        method: "getUserWalletBalance",
+                        walletAddress: blockchainAccount,
+                        contractAddress: contracts[dex]
+                    }
+                }
+
+                httpRequest(JSON.stringify(request.params), request.url, onResponse)           
+            
+                function onResponse(err, data) {
+                    --neededResponses
+                    if (err.result === GLOBAL.DEFAULT_FAIL_RESPONSE) {
+                        console.log((new Date()).toISOString(), '[WARN] Error fetching ' + dex + ' liquidity tokens for asset ' + asset + ' of user profile ' + userProfile.name)
+                        userProfile.payload.blockchainTokens = undefined
+                    } else {
+                        let commandResponse = JSON.parse(data)
+                        if (commandResponse.result !== "Ok") {
+                            console.log((new Date()).toISOString(), '[WARN] Web3 Error fetching ' + dex + ' liquidity tokens for asset ' + asset + ' of user profile ' + userProfile.name)
+                            return
+                        }
+
+                        tokenTotal = tokenTotal + Number(commandResponse.balance)
+                        console.log((new Date()).toISOString(), '[INFO]', dex ,'Liquidity of', userProfile.name, 'for asset', asset, 'is ', Number(commandResponse.balance))
+                        if (neededResponses === 0) {
+                            userProfile.payload.liquidityTokens[asset] = tokenTotal
+                            console.log((new Date()).toISOString(), '[INFO] TOTAL Liquidity of', userProfile.name, 'for asset', asset, 'is ', userProfile.payload.liquidityTokens[asset])
+                            userProfile.payload.uiObject.setInfoMessage('Balance Successfully Loaded for asset ' + asset,
+                                UI.projects.governance.globals.designer.SET_INFO_COUNTER_FACTOR
+                            )
+                        }
+                    }
+                }            
+            }            
+        }
+
     }
 
     function draw() {

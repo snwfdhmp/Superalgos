@@ -4,7 +4,7 @@ function newAppPostLoader() {
     const MODULE_NAME = 'Post Loader'
     const ERROR_LOG = true
     const logger = newWebDebugLog()
-    
+
 
     let thisObject = {
         start: start
@@ -14,9 +14,19 @@ function newAppPostLoader() {
 
     function start() {
         try {
-  
+
             // autoSaveWhenClosingTheBrowser()
-            setupProjectsSchema()
+            setupEnvironment()
+
+            function setupEnvironment() {
+                httpRequest(undefined, 'Environment', onResponse)
+
+                function onResponse(err, file) {
+                    UI.environment = JSON.parse(file)
+                    setupProjectsSchema()
+                    setupProjectsMenu()
+                }
+            }
 
             function setupProjectsSchema() {
                 httpRequest(undefined, 'ProjectsSchema', onResponse)
@@ -24,6 +34,14 @@ function newAppPostLoader() {
                 function onResponse(err, file) {
                     PROJECTS_SCHEMA = JSON.parse(file)
                     setupSchemas()
+                }
+            }
+
+            function setupProjectsMenu() {
+                httpRequest(undefined, 'ProjectsMenu', onResponse)
+
+                function onResponse(err, file) {
+                    PROJECTS_MENU = JSON.parse(file)
                 }
             }
 
@@ -226,7 +244,7 @@ function newAppPostLoader() {
         window.addEventListener('keydown', window.manageBackRefresh)
 
         function saveWorkspace() {
-            UI.projects.foundations.spaces.designSpace.workspace.save()
+            UI.projects.workspaces.spaces.designSpace.workspace.save()
         }
     }
 }

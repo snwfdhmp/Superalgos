@@ -55,12 +55,14 @@ function newPlotter() {
     let onDisplaceEventSubscriptionId
     let scaleChangedEventSubscriptionId
 
+    let imageNameMap = new Map()
+
     let logged = false
     return thisObject
 
     function finalize() {
         try {
-            /* Stop listening to the necesary events. */
+            /* Stop listening to the necessary events. */
             thisObject.container.eventHandler.stopListening(onMouseOverEventSuscriptionId)
             UI.projects.foundations.spaces.chartingSpace.viewport.eventHandler.stopListening(zoomChangedEventSubscriptionId)
             UI.projects.foundations.spaces.chartingSpace.viewport.eventHandler.stopListening(offsetChangedEventSubscriptionId)
@@ -87,6 +89,7 @@ function newPlotter() {
             mustRecalculateDataPoints = undefined
             atMousePositionFillStyles = undefined
             atMousePositionStrokeStyles = undefined
+            imageNameMap = undefined
         } catch (err) {
             if (ERROR_LOG === true) { logger.write('[ERROR] finalize -> err = ' + err.stack.stack) }
         }
@@ -113,7 +116,7 @@ function newPlotter() {
             marketFile = marketFiles.getFile(pTimeFrame)
             fileCursor = dailyFiles.getFileCursor(pTimeFrame)
 
-            /* Listen to the necesary events. */
+            /* Listen to the necessary events. */
             zoomChangedEventSubscriptionId = UI.projects.foundations.spaces.chartingSpace.viewport.eventHandler.listenToEvent('Zoom Changed', onViewportZoomChanged)
             offsetChangedEventSubscriptionId = UI.projects.foundations.spaces.chartingSpace.viewport.eventHandler.listenToEvent('Position Changed', onViewportPositionChanged)
             dragFinishedEventSubscriptionId = canvas.eventHandler.listenToEvent('Drag Finished', onDragFinished)
@@ -404,7 +407,7 @@ function newPlotter() {
             if (fileCursor === undefined) {
                 records = []
                 return
-            }    // We need to wait until there is a fileCursor available or maybe this indicator does not produce data for the current Time Frame
+            }    // We need to wait until there is a fileCursor available or maybe this indicator or study does not produce data for the current Time Frame
             if (fileCursor.files.size === 0) { return } // We need to wait until there are files in the cursor
 
             let daysOnSides = getSideDays(timeFrame)
@@ -452,7 +455,7 @@ function newPlotter() {
             if (marketFile === undefined) {
                 records = []
                 return
-            }    // Initialization not complete yet or this indicator does not produce data for the current time frame
+            }    // Initialization not complete yet or this indicator or study does not produce data for the current time frame
 
             let daysOnSides = getSideDays(timeFrame)
 
@@ -491,7 +494,7 @@ function newPlotter() {
 
     function plot() {
         try {
-            /* Clean the pannel at places where there is no record. */
+            /* Clean the panel at places where there is no record. */
             thisObject.container.eventHandler.raiseEvent('Current Record Changed', undefined)
 
             for (let i = 0; i < records.length; i++) {
@@ -527,7 +530,7 @@ function newPlotter() {
                             } else {
                                 if (productDefinition.referenceParent.config.rateInArrayAtIndex !== undefined) {
                                     /*
-                                    If this property is present, it means for us that the rate is not comming as 
+                                    If this property is present, it means for us that the rate is not coming as
                                     a property of the record object, but instead, the record object contains an 
                                     array at the property ratePropertyName, and inside that array there are other 
                                     arrays from where we need to find the rate at some of its records at the index
@@ -539,7 +542,7 @@ function newPlotter() {
                                         let rateArrayItem = rateArray[i]
                                         /* 
                                         Here we will take the rate for this array item and we will apply the offset
-                                        rules defined at the Plotter Module Config for this kind of sitiations.
+                                        rules defined at the Plotter Module Config for this kind of situations.
                                         */
                                         let rate = rateArrayItem[productDefinition.referenceParent.config.rateInArrayAtIndex]
                                         let point = {
@@ -579,7 +582,7 @@ function newPlotter() {
                                     }
                                 } else {
                                     /* 
-                                    Current Record depends that the mouse pointer is within a range close enought to the rate 
+                                    Current Record depends that the mouse pointer is within a range close enough to the rate
                                     */
                                     if (record[ratePropertyName] >= minUserPositionRate && record[ratePropertyName] <= maxUserPositionRate) {
                                         currentRecordChanged()
@@ -732,7 +735,7 @@ function newPlotter() {
                                 let dataPointObject = record.dataPoints.get(polygonVertex.referenceParent.id)
                                 if (dataPointObject === undefined) {
                                     polygonVertex.payload.uiObject.setErrorMessage('Vertex not referencing any Point')
-                                    console.log('[WARN] You have a Polygon Vertex not referencing any Point.')
+                                    console.log((new Date()).toISOString(), '[WARN] You have a Polygon Vertex not referencing any Point.')
                                     continue
                                 }
 
@@ -740,7 +743,7 @@ function newPlotter() {
                                     x: dataPointObject.x,
                                     y: dataPointObject.y
                                 }
-                                /* We make sure the points do not fall outside the viewport visible area. This step allways need to be done.  */
+                                /* We make sure the points do not fall outside the viewport visible area. This step always need to be done.  */
                                 dataPoint = UI.projects.foundations.spaces.chartingSpace.viewport.fitIntoVisibleArea(dataPoint)
                                 dataPoint = thisObject.fitFunction(dataPoint)
 
@@ -802,6 +805,13 @@ function newPlotter() {
                         let offsetY = 0
                         let imagePosition = { x: 0, y: 0 }
                         if (image.config.codeName !== undefined) { imageName = image.config.codeName }
+                        if (image.imageFormula !== undefined) {
+                            imageName = imageNameMap.get(image.imageFormula.code)
+                            if (imageName === undefined) {
+                                imageName = eval(image.imageFormula.code)
+                                imageNameMap.set(image.imageFormula.code, imageName)
+                            }
+                        }
                         if (image.config.size !== undefined) { imageSize = image.config.size }
                         if (image.imagePosition.config.offsetX !== undefined) { offsetX = image.imagePosition.config.offsetX }
                         if (image.imagePosition.config.offsetY !== undefined) { offsetY = image.imagePosition.config.offsetY }
@@ -818,7 +828,7 @@ function newPlotter() {
 
                         imagePosition = thisObject.fitFunction(imagePosition, true)
 
-                        let imageToDraw = UI.projects.foundations.spaces.designSpace.getIconByProjectAndName('Foundations', imageName)
+                        let imageToDraw = UI.projects.workspaces.spaces.designSpace.getIconByProjectAndName('Foundations', imageName)
                         if (imageToDraw !== undefined) {
                             if (imageToDraw.canDrawIcon === true) {
                                 browserCanvasContext.drawImage(imageToDraw, imagePosition.x, imagePosition.y, imageSize, imageSize)
@@ -881,7 +891,7 @@ function newPlotter() {
 
     function checkOutOfScreen(i, record) {
         /*
-        In the formulas to create plotters, we allos users to reference the previous record.
+        In the formulas to create plotters, we allows users to reference the previous record.
         To enable that we need to link all records to the previous one in this way.
         */
         if (i == 0) {
@@ -947,8 +957,8 @@ function newPlotter() {
                         }
 
                         /*
-                        The information we store in files is independent from the charing system and its coordinate systems.
-                        That means that the first thing we allways need to do is to trasform these points to the coordinate system of the timeline.
+                        The information we store in files is independent from the charting system and its coordinate systems.
+                        That means that the first thing we always need to do is to transform these points to the coordinate system of the timeline.
                         */
                         let dataPoint
                         dataPoint = coordinateSystem.transformThisPoint(rawPoint)

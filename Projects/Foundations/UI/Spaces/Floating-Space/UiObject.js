@@ -1,10 +1,6 @@
 
 function newUiObject() {
     const MODULE_NAME = 'UI Object'
-    const ERROR_LOG = true
-
-    const logger = newWebDebugLog()
-
 
     let thisObject = {
         fitFunction: undefined,
@@ -14,13 +10,13 @@ function newUiObject() {
         isOnFocus: false,
         container: undefined,
         payload: undefined,
-        codeEditor: undefined,
-        configEditor: undefined,
         conditionEditor: undefined,
-        formulaEditor: undefined,
+        listSelector: undefined,
         uiObjectTitle: undefined,
+        icon: undefined,
         uiObjectMessage: undefined,
         circularProgressBar: undefined,
+        isLoading: undefined,
         isRunning: undefined,
         isPlaying: undefined,
         shortcutKey: undefined,
@@ -34,6 +30,9 @@ function newUiObject() {
         percentageAngleOffset: 0,
         statusAtAngle: false,
         statusAngleOffset: 0,
+        highlightReferenceChildren: false,
+        drawReferenceLine: false,
+        getHighlightReferenceChildrenStatus: getHighlightReferenceChildrenStatus,
         run: run,
         stop: stop,
         heartBeat: heartBeat,
@@ -57,6 +56,8 @@ function newUiObject() {
         resetPercentage: resetPercentage,
         setStatus: setStatus,
         resetStatus: resetStatus,
+        setQuickInfo: setQuickInfo,
+        resetQuickInfo: resetQuickInfo,
         physics: physics,
         invisiblePhysics: invisiblePhysics,
         drawBackground: drawBackground,
@@ -75,6 +76,7 @@ function newUiObject() {
     thisObject.container.frame.radius = 0
     thisObject.container.frame.position.x = 0
     thisObject.container.frame.position.y = 0
+    thisObject.container.uiObject = thisObject
 
     let icon
     let executingIcon
@@ -103,6 +105,8 @@ function newUiObject() {
 
     let hasStatus
     let statusCounter = 0
+
+    let hasQuickInfo
 
     let previousDistanceToChainParent
     let readyToChainAttachDisplayCounter = 5
@@ -138,6 +142,7 @@ function newUiObject() {
     let valueMinDecimals = undefined
     let currentPercentage = ''
     let currentStatus = ''
+    let currentQuickInfo = ''
     let rightDragging = false
 
     let eventSubscriptionIdOnError
@@ -162,6 +167,8 @@ function newUiObject() {
     let errorRingDirectionAnimation = 1
     let warningRingDirectionAnimation = 1
     let infoRingDirectionAnimation = 1
+
+    let schemaDocument
 
     thisObject.isRunning = false
 
@@ -188,24 +195,14 @@ function newUiObject() {
         thisObject.fitFunction = undefined
         thisObject.isVisibleFunction = undefined
 
-        if (thisObject.codeEditor !== undefined) {
-            thisObject.codeEditor.finalize()
-            thisObject.codeEditor = undefined
-        }
-
-        if (thisObject.configEditor !== undefined) {
-            thisObject.configEditor.finalize()
-            thisObject.configEditor = undefined
-        }
-
         if (thisObject.conditionEditor !== undefined) {
             thisObject.conditionEditor.finalize()
             thisObject.conditionEditor = undefined
         }
 
-        if (thisObject.formulaEditor !== undefined) {
-            thisObject.formulaEditor.finalize()
-            thisObject.formulaEditor = undefined
+        if (thisObject.listSelector !== undefined) {
+            thisObject.listSelector.finalize()
+            thisObject.listSelector = undefined
         }
 
         icon = undefined
@@ -218,6 +215,8 @@ function newUiObject() {
         errorDocs = undefined
         warningDocs = undefined
         infoDocs = undefined
+
+        schemaDocument = undefined
     }
 
     function finalizeEventsServerClient() {
@@ -244,10 +243,12 @@ function newUiObject() {
 
     function initialize(payload, menuItemsInitialValues) {
         thisObject.payload = payload
+        schemaDocument = getSchemaDocument(thisObject.payload.node)
 
         /* Initialize the Menu */
 
         thisObject.menu = newCircularMenu()
+        thisObject.menu.isOpen = true
         thisObject.menu.initialize(menuItemsInitialValues, thisObject.payload)
         thisObject.menu.container.connectToParent(thisObject.container, false, false, true, true, false, false, true, true)
 
@@ -271,6 +272,10 @@ function newUiObject() {
 
         iconPhysics()
 
+        if (thisObject.icon === undefined) {
+            console.log((new Date()).toISOString(), '[ERROR] uiObject -> initialize -> err = Icon not found, Project: "' + thisObject.payload.node.project + '", Type: "' + thisObject.payload.node.type + '"')
+        }
+
         selfFocusEventSubscriptionId = thisObject.container.eventHandler.listenToEvent('onFocus', onFocus)
         selfNotFocusEventSubscriptionId = thisObject.container.eventHandler.listenToEvent('onNotFocus', onNotFocus)
         selfDisplaceEventSubscriptionId = thisObject.container.eventHandler.listenToEvent('onDisplace', onDisplace)
@@ -283,45 +288,27 @@ function newUiObject() {
         let container
 
         if (isDragging === false && thisObject.isOnFocus === true) {
-            if (thisObject.codeEditor !== undefined) {
-                container = thisObject.codeEditor.getContainer(point)
-                if (container !== undefined) { return container }
-            }
 
-            if (thisObject.configEditor !== undefined) {
-                container = thisObject.configEditor.getContainer(point)
-                if (container !== undefined) { return container }
-            }
 
             if (thisObject.conditionEditor !== undefined) {
                 container = thisObject.conditionEditor.getContainer(point)
                 if (container !== undefined) { return container }
             }
 
-            if (thisObject.formulaEditor !== undefined) {
-                container = thisObject.formulaEditor.getContainer(point)
+            if (thisObject.listSelector !== undefined) {
+                container = thisObject.listSelector.getContainer(point)
                 if (container !== undefined) { return container }
             }
 
             let getitle = true
 
-            if (thisObject.codeEditor !== undefined) {
-                if (thisObject.codeEditor.visible === true) {
-                    getitle = false
-                }
-            }
-            if (thisObject.configEditor !== undefined) {
-                if (thisObject.configEditor.visible === true) {
-                    getitle = false
-                }
-            }
             if (thisObject.conditionEditor !== undefined) {
                 if (thisObject.conditionEditor.visible === true) {
                     getitle = false
                 }
             }
-            if (thisObject.formulaEditor !== undefined) {
-                if (thisObject.formulaEditor.visible === true) {
+            if (thisObject.listSelector !== undefined) {
+                if (thisObject.listSelector.visible === true) {
                     getitle = false
                 }
             }
@@ -359,20 +346,33 @@ function newUiObject() {
         thisObject.menu.physics()
         thisObject.uiObjectMessage.physics()
 
-        if (thisObject.codeEditor !== undefined) {
-            thisObject.codeEditor.physics()
+        /* Count how many menu's are open and expand as required */
+        let openMenuCount = 0
+
+        evaluateMenu(thisObject.menu)
+
+        function evaluateMenu(menu) {
+            if (menu !== undefined) {
+                if (menu.isOpen === true) {
+                    openMenuCount++
+                }
+                for (let i = 0; i < menu.menuItems.length; i++) {
+                    evaluateMenu(menu.menuItems[i].menu)
+                }
+            }
         }
 
-        if (thisObject.configEditor !== undefined) {
-            thisObject.configEditor.physics()
-        }
+        thisObject.payload.floatingObject.container.frame.radius =
+            thisObject.payload.floatingObject.targetRadius +
+            ((openMenuCount - 1) *
+                (250 * UI.projects.foundations.spaces.floatingSpace.settings.node.menuItem.widthPercentage / 100))
 
         if (thisObject.conditionEditor !== undefined) {
             thisObject.conditionEditor.physics()
         }
 
-        if (thisObject.formulaEditor !== undefined) {
-            thisObject.formulaEditor.physics()
+        if (thisObject.listSelector !== undefined) {
+            thisObject.listSelector.physics()
         }
 
         if (thisObject.payload.chainParent === undefined || thisObject.payload.chainParent.payload === undefined) {
@@ -478,7 +478,7 @@ function newUiObject() {
                 if (floatingObject.payload === undefined) { continue }
                 let nearbyNode = floatingObject.payload.node
                 if (compatibleTypes.indexOf('->' + nearbyNode.type + '->') >= 0) {
-                    /* Discard App Schema defined objects with busy coonection ports */
+                    /* Discard App Schema defined objects with busy connection ports */
                     schemaDocument = getSchemaDocument(thisObject.payload.node)
                     if (schemaDocument !== undefined) {
                         let mustContinue = false
@@ -507,7 +507,7 @@ function newUiObject() {
                         if (mustContinue === true) { continue }
                     }
 
-                    /* Discard Phases without partent */
+                    /* Discard Phases without parent */
                     if (thisObject.payload.node.type === 'Phase' && nearbyNode.type === 'Phase' && nearbyNode.payload.parentNode === undefined) { continue }
                     /* Control maxPhases */
                     if (thisObject.payload.node.type === 'Phase') {
@@ -585,7 +585,7 @@ function newUiObject() {
             let THRESHOLD = 1.15
 
             if (ratio > THRESHOLD) {
-                UI.projects.foundations.spaces.designSpace.workspace.executeAction({ node: thisObject.payload.node, name: 'Parent Detach', project: 'Foundations' })
+                UI.projects.workspaces.spaces.designSpace.workspace.executeAction({ node: thisObject.payload.node, name: 'Parent Detach', project: 'Visual-Scripting' })
             }
         }
 
@@ -692,13 +692,13 @@ function newUiObject() {
             let THRESHOLD = 1.15
 
             if (ratio > THRESHOLD) {
-                UI.projects.foundations.spaces.designSpace.workspace.executeAction({ node: thisObject.payload.node, name: 'Reference Detach', project: 'Foundations' })
+                UI.projects.workspaces.spaces.designSpace.workspace.executeAction({ node: thisObject.payload.node, name: 'Reference Detach', project: 'Visual-Scripting' })
             }
         }
 
         function highlightPhisycs() {
             highlightCounter--
-            if (highlightCounter < 0) {
+            if (highlightCounter < 0 || (thisObject.payload.parentNode === undefined && schemaDocument.isHierarchyHead !== true)) {
                 highlightCounter = 0
                 isHighlighted = false
             }
@@ -706,7 +706,7 @@ function newUiObject() {
 
         function runningAtBackendPhisycs() {
             runningAtBackendCounter--
-            if (runningAtBackendCounter < 0) {
+            if (runningAtBackendCounter < 0 || (thisObject.payload.parentNode === undefined && schemaDocument.isHierarchyHead !== true)) {
                 runningAtBackendCounter = 0
                 isRunningAtBackend = false
             }
@@ -714,7 +714,7 @@ function newUiObject() {
 
         function errorMessagePhisycs() {
             errorMessageCounter--
-            if (errorMessageCounter < 0) {
+            if (errorMessageCounter < 0 || (thisObject.payload.parentNode === undefined && schemaDocument.isHierarchyHead !== true)) {
                 errorMessageCounter = 0
                 thisObject.hasError = false
 
@@ -727,7 +727,7 @@ function newUiObject() {
 
         function warningMessagePhisycs() {
             warningMessageCounter--
-            if (warningMessageCounter < 0) {
+            if (warningMessageCounter < 0 || (thisObject.payload.parentNode === undefined && schemaDocument.isHierarchyHead !== true)) {
                 warningMessageCounter = 0
                 thisObject.hasWarning = false
 
@@ -740,7 +740,7 @@ function newUiObject() {
 
         function infoMessagePhisycs() {
             infoMessageCounter--
-            if (infoMessageCounter < 0) {
+            if (infoMessageCounter < 0 || (thisObject.payload.parentNode === undefined && schemaDocument.isHierarchyHead !== true)) {
                 infoMessageCounter = 0
                 thisObject.hasInfo = false
 
@@ -753,7 +753,7 @@ function newUiObject() {
 
         function valuePhisycs() {
             valueCounter--
-            if (valueCounter < 0) {
+            if (valueCounter < 0 || (thisObject.payload.parentNode === undefined && schemaDocument.isHierarchyHead !== true)) {
                 valueCounter = 0
                 hasValue = false
             }
@@ -761,7 +761,7 @@ function newUiObject() {
 
         function percentagePhisycs() {
             percentageCounter--
-            if (percentageCounter < 0) {
+            if (percentageCounter < 0 || (thisObject.payload.parentNode === undefined && schemaDocument.isHierarchyHead !== true)) {
                 percentageCounter = 0
                 hasPercentage = false
             }
@@ -769,7 +769,7 @@ function newUiObject() {
 
         function statusPhisycs() {
             statusCounter--
-            if (statusCounter < 0) {
+            if (statusCounter < 0 || (thisObject.payload.parentNode === undefined && schemaDocument.isHierarchyHead !== true)) {
                 statusCounter = 0
                 hasStatus = false
             }
@@ -866,7 +866,7 @@ function newUiObject() {
             Next, we are going to try to inform the parent that this 
             node has an error, as a way to show the end user where the
             node with error is. This is useful to detect errors in nodes
-            that are located at braches that are collapsed.
+            that are located at branches that are collapsed.
             */
 
             if (thisObject.payload !== undefined) {
@@ -908,7 +908,7 @@ function newUiObject() {
             Next, we are going to try to inform the parent that this 
             node has an warning, as a way to show the end user where the
             node with warning is. This is useful to detect warnings in nodes
-            that are located at braches that are collapsed.
+            that are located at branches that are collapsed.
             */
 
             if (thisObject.payload !== undefined) {
@@ -950,7 +950,7 @@ function newUiObject() {
             Next, we are going to try to inform the parent that this 
             node has an info, as a way to show the end user where the
             node with info is. This is useful to detect infos in nodes
-            that are located at braches that are collapsed.
+            that are located at branches that are collapsed.
             */
 
             if (thisObject.payload !== undefined) {
@@ -1037,6 +1037,18 @@ function newUiObject() {
         currentStatus = undefined
         hasStatus = false
         statusCounter = 0
+    }
+
+    function setQuickInfo(quickInfo) {
+        if (quickInfo !== undefined) {
+            currentQuickInfo = quickInfo
+            hasQuickInfo = true
+        }
+    }
+
+    function resetQuickInfo() {
+        currentQuickInfo = undefined
+        hasQuickInfo = false
     }
 
     function heartBeat() {
@@ -1175,7 +1187,7 @@ function newUiObject() {
     async function getTargetUiObject(message) {
         let uiObject = thisObject
         if (message.event.nodeId !== undefined) {
-            let targetNode = await UI.projects.foundations.spaces.designSpace.workspace.getNodeById(message.event.nodeId)
+            let targetNode = await UI.projects.workspaces.spaces.designSpace.workspace.getNodeById(message.event.nodeId)
             if (targetNode !== undefined) {
                 if (targetNode.payload !== undefined) {
                     if (targetNode.payload.uiObject !== undefined) {
@@ -1212,7 +1224,7 @@ function newUiObject() {
             answer to the command to stop. In those cases, we will stop execute the onStopped function anyways so as to 
             return the UI to its default state.
             */
-            setTimeout(returnToDefaultState, 15000)
+            setTimeout(returnToDefaultState, 10000)
             function returnToDefaultState() {
                 if (wasStopped === false) {
                     completeStop(callBackFunction, event)
@@ -1241,7 +1253,7 @@ function newUiObject() {
     }
 
     function iconPhysics() {
-        icon = UI.projects.foundations.spaces.designSpace.getIconByProjectAndType(thisObject.payload.node.project, thisObject.payload.node.type)
+        icon = UI.projects.workspaces.spaces.designSpace.getIconByProjectAndType(thisObject.payload.node.project, thisObject.payload.node.type)
         let schemaDocument = getSchemaDocument(thisObject.payload.node)
 
         /*
@@ -1251,13 +1263,14 @@ function newUiObject() {
         node that actually has the icon list.
 
         On the other hand, if this icon has the icon list definition, then the value of alternativeIcons
-        shoudl be an array of the possible icons. Then to pick one icon from that list we will check 
+        should be an array of the possible icons. Then to pick one icon from that list we will check
         the config.condeName of the node to see with which icon on the list matches.
 
         Finally, if the node we are pointing to does not have a config or does not have a list of 
         alternativeIcons, we will just use that node's icon for the current node.
         */
-        if (schemaDocument.alternativeIcons !== undefined) {
+        if (schemaDocument.alternativeIcons !== undefined && schemaDocument.alternativeIcons !== 'Use External Github Icon') {
+
             let nodeToUse = thisObject.payload.node
             if (schemaDocument.alternativeIcons === 'Use Parent') {
                 if (thisObject.payload.node.payload.parentNode !== undefined) {
@@ -1300,7 +1313,7 @@ function newUiObject() {
                             iconName = alternativeIcon.iconName
                         }
                     }
-                    let newIcon = UI.projects.foundations.spaces.designSpace.getIconByProjectAndName(nodeToUse.project, iconName)
+                    let newIcon = UI.projects.workspaces.spaces.designSpace.getIconByProjectAndName(nodeToUse.project, iconName)
                     if (newIcon !== undefined) {
                         icon = newIcon
                     }
@@ -1309,15 +1322,25 @@ function newUiObject() {
                 }
             } else {
                 if (schemaDocument.icon !== undefined) {
-                    let newIcon = UI.projects.foundations.spaces.designSpace.getIconByProjectAndName(nodeToUse.project, schemaDocument.icon)
+                    let newIcon = UI.projects.workspaces.spaces.designSpace.getIconByProjectAndName(nodeToUse.project, schemaDocument.icon)
                     if (newIcon !== undefined) {
                         icon = newIcon
                     }
                 }
             }
+        } else if (schemaDocument.alternativeIcons === 'Use External Github Icon' && icon !== undefined) {
+
+            let config = JSON.parse(thisObject.payload.node.config)
+            let url = 'https://www.github.com/' + config.codeName + '.png'
+            let image = UI.projects.workspaces.spaces.designSpace.getIconByExternalSource(thisObject.payload.node.project, url)
+
+            if (image.canDrawIcon === true) {
+                icon = image
+            }
         }
 
-        executingIcon = UI.projects.foundations.spaces.designSpace.getIconByProjectAndName('Foundations', 'bitcoin')
+        thisObject.icon = icon
+        executingIcon = UI.projects.workspaces.spaces.designSpace.getIconByProjectAndName('Foundations', 'bitcoin')
     }
 
     function onFocus() {
@@ -1334,17 +1357,13 @@ function newUiObject() {
 
     function onNotFocus() {
         thisObject.isOnFocus = false
-        if (thisObject.codeEditor !== undefined) {
-            thisObject.codeEditor.deactivate()
-        }
-        if (thisObject.configEditor !== undefined) {
-            thisObject.configEditor.deactivate()
-        }
+
         if (thisObject.conditionEditor !== undefined) {
             thisObject.conditionEditor.deactivate()
         }
-        if (thisObject.formulaEditor !== undefined) {
-            thisObject.formulaEditor.deactivate()
+
+        if (thisObject.listSelector !== undefined) {
+            thisObject.listSelector.deactivate()
         }
 
         if (thisObject.payload !== undefined &&
@@ -1362,17 +1381,12 @@ function newUiObject() {
 
     function onDragStarted(event) {
         thisObject.uiObjectTitle.exitEditMode()
-        if (thisObject.codeEditor !== undefined) {
-            thisObject.codeEditor.deactivate()
-        }
-        if (thisObject.configEditor !== undefined) {
-            thisObject.configEditor.deactivate()
-        }
+
         if (thisObject.conditionEditor !== undefined) {
             thisObject.conditionEditor.deactivate()
         }
-        if (thisObject.formulaEditor !== undefined) {
-            thisObject.formulaEditor.deactivate()
+        if (thisObject.listSelector !== undefined) {
+            thisObject.listSelector.deactivate()
         }
         isDragging = true
         if (event.button === 2) {
@@ -1387,14 +1401,14 @@ function newUiObject() {
 
     function onDragFinished(event) {
         if (isChainAttaching === true) {
-            UI.projects.foundations.spaces.designSpace.workspace.executeAction({ node: thisObject.payload.node, name: 'Parent Attach', project: 'Foundations', relatedNode: chainAttachToNode })
+            UI.projects.workspaces.spaces.designSpace.workspace.executeAction({ node: thisObject.payload.node, name: 'Parent Attach', project: 'Visual-Scripting', relatedNode: chainAttachToNode })
             chainAttachToNode = undefined
             isChainAttaching = false
             /* We want to avoid the situation in which we are attaching a node to its parent and at the same time referencing another node. */
             isReferenceAttaching = false
         }
         if (isReferenceAttaching === true) {
-            UI.projects.foundations.spaces.designSpace.workspace.executeAction({ node: thisObject.payload.node, name: 'Reference Attach', project: 'Foundations', relatedNode: referenceAttachToNode })
+            UI.projects.workspaces.spaces.designSpace.workspace.executeAction({ node: thisObject.payload.node, name: 'Reference Attach', project: 'Visual-Scripting', relatedNode: referenceAttachToNode })
             referenceAttachToNode = undefined
             isReferenceAttaching = false
         }
@@ -1433,9 +1447,6 @@ function newUiObject() {
     function drawForeground() {
         if (thisObject.isOnFocus === false) {
             drawBodyAndPicture()
-            if (isDragging === false) {
-                thisObject.menu.drawForeground()
-            }
         }
 
         if (thisObject.circularProgressBar !== undefined) {
@@ -1448,46 +1459,31 @@ function newUiObject() {
             drawReferenceLine()
             drawChainLine()
 
-            if (thisObject.codeEditor !== undefined) {
-                thisObject.codeEditor.drawBackground()
-                thisObject.codeEditor.drawForeground()
-            }
-            if (thisObject.configEditor !== undefined) {
-                thisObject.configEditor.drawBackground()
-                thisObject.configEditor.drawForeground()
-            }
+
+
             if (thisObject.conditionEditor !== undefined) {
                 thisObject.conditionEditor.drawBackground()
                 thisObject.conditionEditor.drawForeground()
             }
-            if (thisObject.formulaEditor !== undefined) {
-                thisObject.formulaEditor.drawBackground()
-                thisObject.formulaEditor.drawForeground()
+
+            if (thisObject.listSelector !== undefined) {
+                thisObject.listSelector.drawBackground()
+                thisObject.listSelector.drawForeground()
             }
 
             let drawMenu = true
             let drawTitle = true
 
-            if (thisObject.codeEditor !== undefined) {
-                if (thisObject.codeEditor.visible === true) {
-                    drawMenu = false
-                    drawTitle = false
-                }
-            }
-            if (thisObject.configEditor !== undefined) {
-                if (thisObject.configEditor.visible === true) {
-                    drawMenu = false
-                    drawTitle = false
-                }
-            }
+
             if (thisObject.conditionEditor !== undefined) {
                 if (thisObject.conditionEditor.visible === true) {
                     drawMenu = false
                     drawTitle = false
                 }
             }
-            if (thisObject.formulaEditor !== undefined) {
-                if (thisObject.formulaEditor.visible === true) {
+
+            if (thisObject.listSelector !== undefined) {
+                if (thisObject.listSelector.visible === true) {
                     drawMenu = false
                     drawTitle = false
                 }
@@ -1507,6 +1503,7 @@ function newUiObject() {
             drawValue()
             drawPercentage()
             drawStatus()
+            drawQuickInfo()
 
             if (drawTitle === true) {
                 thisObject.uiObjectTitle.draw()
@@ -1592,7 +1589,7 @@ function newUiObject() {
     }
 
     function drawReferenceLine() {
-        if (UI.projects.foundations.spaces.floatingSpace.drawReferenceLines === false && thisObject.isOnFocus === false) { return }
+        if (UI.projects.foundations.spaces.floatingSpace.drawReferenceLines === false && thisObject.drawReferenceLine === false && thisObject.isOnFocus === false) { return }
         if (thisObject.payload.referenceParent === undefined) { return }
         if (thisObject.payload.referenceParent.payload === undefined) { return }
         if (thisObject.payload.referenceParent.payload.floatingObject === undefined) { return }
@@ -1654,20 +1651,13 @@ function newUiObject() {
     }
 
     function isEditorVisible() {
-        if (thisObject.codeEditor !== undefined) {
-            if (thisObject.codeEditor.visible === true) { return true }
-        }
-
-        if (thisObject.configEditor !== undefined) {
-            if (thisObject.configEditor.visible === true) { return true }
-        }
 
         if (thisObject.conditionEditor !== undefined) {
             if (thisObject.conditionEditor.visible === true) { return true }
         }
 
-        if (thisObject.formulaEditor !== undefined) {
-            if (thisObject.formulaEditor.visible === true) { return true }
+        if (thisObject.listSelector !== undefined) {
+            if (thisObject.listSelector.visible === true) { return true }
         }
     }
 
@@ -1991,6 +1981,64 @@ function newUiObject() {
         }
     }
 
+    function drawQuickInfo() {
+        if (hasQuickInfo === false) { return }
+        if (UI.projects.foundations.spaces.floatingSpace.inMapMode === true) { return }
+
+        let position = {
+            x: 0,
+            y: 0
+        }
+
+        position = thisObject.container.frame.frameThisPoint(position)
+
+        let radius = thisObject.payload.floatingObject.container.frame.radius
+        /* Label Text */
+        let labelPoint
+        let fontSize = 20
+        let lineSeparator = 25
+        let label
+
+        browserCanvasContext.font = fontSize + 'px ' + UI_FONT.PRIMARY
+
+        if (radius > 6) {
+            const IDEAL_LABEL_LENGTH = 80
+
+            label = currentQuickInfo
+
+            if (label !== undefined && label !== null) {
+                if (label.length > IDEAL_LABEL_LENGTH) {
+                    if (label.length > IDEAL_LABEL_LENGTH * 3) {
+                        label = label.substring(0, IDEAL_LABEL_LENGTH * 3) + '...'
+                    }
+                }
+
+                /* Split the line into Phrases */
+                let phrases = splitTextIntoPhrases(label, 5)
+                if (phrases.length === 1) {
+                    phrases.push("")
+                }
+                if (phrases.length === 2) {
+                    phrases.push("")
+                }
+
+                for (let i = 0; i < phrases.length; i++) {
+                    let phrase = phrases[i]
+                    labelPoint = {
+                        x: position.x - getTextWidth(phrase) / 2,
+                        y: position.y + lineSeparator * (10 - phrases.length + 1 + i)
+                    }
+                    printMessage(phrase)
+                }
+
+                function printMessage(text) {
+                    browserCanvasContext.fillStyle = 'rgba(' + UI_COLOR.WHITE + ', 1)'
+                    browserCanvasContext.fillText(text, labelPoint.x, labelPoint.y)
+                }
+            }
+        }
+    }
+
     function addIndexNumber(label) {
         switch (thisObject.payload.node.type) {
             case 'Phase': {
@@ -2115,7 +2163,7 @@ function newUiObject() {
             drawHierarchyHeadRing()
             drawProjectHeadRing()
             drawInfoRing()
-            drawWarningRing() 
+            drawWarningRing()
             drawErrorRing()
             drawHighlighted()
             drawReadyToChainAttach()
@@ -2288,6 +2336,9 @@ function newUiObject() {
             function drawHighlighted() {
                 if (isHighlighted === true) {
                     VISIBLE_RADIUS = thisObject.payload.floatingObject.container.frame.radius
+                    if (UI.projects.foundations.spaces.floatingSpace.inMapMode === true) {
+                        VISIBLE_RADIUS = UI.projects.foundations.spaces.floatingSpace.transformRadiusToMap(VISIBLE_RADIUS)
+                    }
                     let OPACITY = highlightCounter / 10
 
                     browserCanvasContext.beginPath()
@@ -2423,6 +2474,7 @@ function newUiObject() {
         /* Image */
         if (icon !== undefined) {
             if (icon.canDrawIcon === true) {
+
                 let additionalImageSize = 0
                 if (isRunningAtBackend === true || isReadyToReferenceAttach === true || isReadyToChainAttach === true) { additionalImageSize = 20 }
                 let totalImageSize = additionalImageSize + thisObject.payload.floatingObject.currentImageSize
@@ -2451,11 +2503,50 @@ function newUiObject() {
                     }
                 }
 
+                // If this UiObject is using an External Icon, apply a Mask to keep it Circular
+                if (schemaDocument.alternativeIcons === 'Use External Github Icon') {
+
+                    let radius = totalImageSize / 2
+
+                    let visiblePosition = {
+                        x: thisObject.container.frame.position.x,
+                        y: thisObject.container.frame.position.y
+                    }
+
+                    visiblePosition = thisObject.container.frame.frameThisPoint(visiblePosition)
+
+                    if (UI.projects.foundations.spaces.floatingSpace.inMapMode === true) {
+                        visiblePosition = UI.projects.foundations.spaces.floatingSpace.transformPointToMap(visiblePosition)
+                    } else {
+                        visiblePosition = thisObject.fitFunction(visiblePosition)
+                    }
+
+                    browserCanvasContext.save()
+
+                    browserCanvasContext.beginPath()
+                    browserCanvasContext.arc(visiblePosition.x, visiblePosition.y, radius, 0, Math.PI * 2, true)
+                    browserCanvasContext.closePath()
+                    browserCanvasContext.clip()
+                }
+
+                // If this UiObject is being loaded then display at half opacity
+                if (thisObject.payload.isLoading === true) {
+                    browserCanvasContext.globalAlpha = 0.5
+                } else {
+                    browserCanvasContext.globalAlpha = 1
+                }
+
                 browserCanvasContext.drawImage(
                     icon, position.x - totalImageSize / 2,
                     position.y - totalImageSize / 2,
                     totalImageSize,
                     totalImageSize)
+
+                browserCanvasContext.globalAlpha = 1
+
+                if (schemaDocument.alternativeIcons === 'Use External Github Icon') {
+                    browserCanvasContext.restore()
+                }
             }
         }
 
@@ -2473,5 +2564,9 @@ function newUiObject() {
                 }
             }
         }
+    }
+
+    function getHighlightReferenceChildrenStatus() {
+        return thisObject.highlightReferenceChildren
     }
 }
